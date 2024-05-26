@@ -22,59 +22,74 @@ class Claw:
         """
         self.driver.execute_script(hide_script)
         try:
-            timeout = WebDriverWait(self.driver, 10).until(
+            timeout_element = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located(
-                    (By.XPATH, '//*[@id="countdown-container"]')
+                    (By.XPATH, '//*[@id="countdown-container"]/h3')
                 )
             )
-            time_print("Prize already claimed today.")
-        except:
-            try:
-                speed_claw_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.XPATH, '//*[@id="speedclaw"]'))
-                )
-                speed_claw_button.click()
-
-                hero_card_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, '//*[contains(text(), "' + hero + '")]')
+            # Execute JavaScript to get the text content directly
+            timeout = self.driver.execute_script(
+                "return arguments[0].textContent.trim();", timeout_element
+            )
+            if timeout == "00 : 00 : 00":
+                time_print("No cooldown. Proceeding to claim prize.")
+                try:
+                    # Code to execute when there is no cooldown
+                    speed_claw_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, '//*[@id="speedclaw"]'))
                     )
-                )
-                hero_card_button.click()
+                    speed_claw_button.click()
 
-                ok_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//div[@id='button' and @onclick='start();']")
+                    hero_card_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, '//*[contains(text(), "' + hero + '")]')
+                        )
                     )
-                )
-                ok_button.click()
+                    hero_card_button.click()
 
-                time_print("Clicked the 'ok' button.")
+                    ok_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//div[@id='button' and @onclick='start();']")
+                        )
+                    )
+                    ok_button.click()
 
-                # Wait for the prize name element to be present and retrieve its text
-                prize_name_element = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, '//*[@id="prize-name"]'))
-                )
-                prize_name_text = prize_name_element.text
+                    time_print("Clicked the 'ok' button.")
 
-                # Wait for the prize info element to be present and retrieve its text
-                prize_info_element = WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, '//*[@id="prize-info"]'))
-                )
-                prize_info_text = prize_info_element.text
+                    input("delay")
+                    # Wait for the prize name element to be present and retrieve its text
+                    prize_name_element = WebDriverWait(self.driver, 10).until(
+                        lambda driver: driver.find_element(By.ID, "prize-name").text
+                        != "Name"
+                    )
+                    prize_name_text = prize_name_element.text
 
-                time_print(f"Prize name: {prize_name_text}")
-                time_print(f"Prize info: {prize_info_text}")
-                self.excel_manager.log_to_excel(hero, prize_name_text, prize_info_text)
-                input("delay")
-            except Exception as e:
-                time_print(f"Error claiming prize. Message: {e}")
+                    # Wait for the prize info element to be present and retrieve its text
+                    prize_info_element = WebDriverWait(self.driver, 10).until(
+                        lambda driver: driver.find_element(By.ID, "prize-info").text
+                        != "Info"
+                    )
+                    prize_info_text = prize_info_element.text
 
-    def pick_heroe(self):
+                    time_print(f"Prize name: {prize_name_text}")
+                    time_print(f"Prize info: {prize_info_text}")
+                    self.excel_manager.log_to_excel(
+                        hero, prize_name_text, prize_info_text
+                    )
+                except Exception as e:
+                    time_print(f"Error during prize claim process. Message: {e}")
+            else:
+                time_print(f"Prize already claimed today. Cooldown active. {timeout}")
+                return
+        except Exception as e:
+            time_print(f"Error checking cooldown or claiming prize. Message: {e}")
+
+    def pick_hero(self):
         self.driver.get("https://risinghub.net/claw")
         time_print("Picking heroe")
-        heroes = getenv("HEROES").split(",")
+        heroes = getenv("HEROES")
         if heroes:
+            heroes = heroes.split(",")
             time_print(f"Heroes in .env: {heroes}")
             last_entry = self.excel_manager.read_last_prize()
             if last_entry:

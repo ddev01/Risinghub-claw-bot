@@ -38,5 +38,5 @@ class SeleniumChecks:
 
     def execute_claw(self):
         time_print("Executing Claw operations")
-        hero = self.claw.pick_heroe()
+        hero = self.claw.pick_hero()
         self.claw.claim_prize(hero)

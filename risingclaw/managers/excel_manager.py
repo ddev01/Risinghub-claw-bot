@@ -20,23 +20,31 @@ class ExcelManager:
     def log_to_excel(self, hero, prize, quantity):
         now = datetime.now()
         data = {
-            "date": [now.date()],
+            "date": [now.strftime("%Y-%m-%d")],  # Ensure date is in string format
             "time": [now.strftime("%H:%M:%S")],
             "hero": [hero],
             "prize": [prize],
             "quantity": [quantity],
         }
 
-        df = pd.read_excel(self.filename)
+        if not path.exists(self.filename):
+            df = pd.DataFrame(columns=self.headers)
+        else:
+            df = pd.read_excel(self.filename)
+
         new_df = pd.DataFrame(data)
         df = pd.concat([df, new_df], ignore_index=True)
         df.to_excel(self.filename, index=False)
 
     def read_last_prize(self) -> dict:
-        df = pd.read_excel(self.filename)
+        df = pd.read_excel(
+            self.filename, parse_dates=["date"]
+        )  # Parse 'date' as datetime object
         if not df.empty and "hero" and "prize" in df.columns:
             last_entry = {
-                "date": df.iloc[-1]["date"],
+                "date": df.iloc[-1]["date"].strftime(
+                    "%Y-%m-%d"
+                ),  # Convert datetime to string
                 "time": df.iloc[-1]["time"],
                 "hero": df.iloc[-1]["hero"],
                 "prize": df.iloc[-1]["prize"],
