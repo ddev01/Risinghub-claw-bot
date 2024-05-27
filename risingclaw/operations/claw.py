@@ -56,18 +56,23 @@ class Claw:
 
                     time_print("Clicked the 'ok' button.")
 
-                    input("delay")
                     # Wait for the prize name element to be present and retrieve its text
                     prize_name_element = WebDriverWait(self.driver, 10).until(
-                        lambda driver: driver.find_element(By.ID, "prize-name").text
-                        != "Name"
+                        lambda driver: (
+                            driver.find_element(By.ID, "prize-name")
+                            if driver.find_element(By.ID, "prize-name").text != "Name"
+                            else False
+                        )
                     )
                     prize_name_text = prize_name_element.text
 
-                    # Wait for the prize info element to be present and retrieve its text
+                    # Correctly wait for the prize info element to have text other than "Info"
                     prize_info_element = WebDriverWait(self.driver, 10).until(
-                        lambda driver: driver.find_element(By.ID, "prize-info").text
-                        != "Info"
+                        lambda driver: (
+                            driver.find_element(By.ID, "prize-info")
+                            if driver.find_element(By.ID, "prize-info").text != "Info"
+                            else False
+                        )
                     )
                     prize_info_text = prize_info_element.text
 
