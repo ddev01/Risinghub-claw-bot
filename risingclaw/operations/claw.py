@@ -4,6 +4,8 @@ from selenium.webdriver.common.by import By
 from os import getenv, environ
 from ..utilities.logger import time_print
 from ..managers.excel_manager import ExcelManager
+from ..services.hide_stuff import hide_stuff
+
 
 
 class Claw:
@@ -13,14 +15,7 @@ class Claw:
 
     def claim_prize(self, hero):
         time_print(f"Claiming prize for {hero}")
-        # Hide any garbage that can possible block the buttons.
-        hide_script = """
-        var ads = document.querySelectorAll('.adsbygoogle');
-        ads.forEach(function(el) { el.style.display = 'none'; });
-        var iframes = document.querySelectorAll('iframe');
-        iframes.forEach(function(el) { el.style.display = 'none'; });
-        """
-        self.driver.execute_script(hide_script)
+        hide_stuff(self.driver)
         try:
             timeout_element = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located(
@@ -55,7 +50,7 @@ class Claw:
                     ok_button.click()
 
                     time_print("Clicked the 'ok' button.")
-
+                    input("delay")
                     # Wait for the prize name element to be present and retrieve its text
                     prize_name_element = WebDriverWait(self.driver, 10).until(
                         lambda driver: (

@@ -4,6 +4,8 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from os import getenv
 from ..utilities.logger import time_print
+from ..services.hide_stuff import hide_stuff
+
 
 
 class Authentication:
@@ -20,6 +22,7 @@ class Authentication:
     def login(self):
         time_print("Performing login")
         self.driver.get("https://risinghub.net/login")
+        hide_stuff(self.driver)
         self.accept_consent()
         try:
             username_field = WebDriverWait(self.driver, 10).until(
