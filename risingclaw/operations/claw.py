@@ -5,6 +5,7 @@ from os import getenv, environ
 from ..utilities.logger import time_print
 from ..managers.excel_manager import ExcelManager
 from ..services.hide_stuff import hide_stuff
+from ..utilities.await_element_text_change import await_element_text_change
 
 
 
@@ -50,26 +51,16 @@ class Claw:
                     ok_button.click()
 
                     time_print("Clicked the 'ok' button.")
-                    input("delay")
                     # Wait for the prize name element to be present and retrieve its text
-                    prize_name_element = WebDriverWait(self.driver, 10).until(
-                        lambda driver: (
-                            driver.find_element(By.ID, "prize-name")
-                            if driver.find_element(By.ID, "prize-name").text != "Name"
-                            else False
-                        )
+                    prize_name_element = await_element_text_change(
+                        self.driver, By.ID, "prize-name", ["Name"], 10
                     )
-                    prize_name_text = prize_name_element.text
+                    prize_name_text = prize_name_element.text if prize_name_element else "No Prize Name Found"
 
-                    # Correctly wait for the prize info element to have text other than "Info"
-                    prize_info_element = WebDriverWait(self.driver, 10).until(
-                        lambda driver: (
-                            driver.find_element(By.ID, "prize-info")
-                            if driver.find_element(By.ID, "prize-info").text != "Info"
-                            else False
-                        )
+                    prize_info_element = await_element_text_change(
+                        self.driver, By.ID, "prize-info", ["Info"], 10
                     )
-                    prize_info_text = prize_info_element.text
+                    prize_info_text = prize_info_element.text if prize_info_element else "No Prize Info Found"
 
                     time_print(f"Prize name: {prize_name_text}")
                     time_print(f"Prize info: {prize_info_text}")

@@ -2,6 +2,9 @@ from selenium import webdriver
 from pickle import load, dump
 from os import path
 from ..utilities.logger import time_print
+from time import sleep
+from selenium.webdriver.support.ui import WebDriverWait
+
 
 
 class CookieManager:
@@ -22,8 +25,11 @@ class CookieManager:
                 cookies = load(file)
                 for cookie in cookies:
                     self.driver.add_cookie(cookie)
-			#For some reason requires 2 refreshes for the cookies to load properly.
+            sleep(1)
+            #For some reason requires 2 refreshes for the cookies to load properly.
             self.driver.refresh()
+            WebDriverWait(self.driver, 10).until(
+                lambda d: d.execute_script('return document.readyState') == 'complete')
             self.driver.refresh()
             return True
         return False
