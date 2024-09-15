@@ -6,6 +6,7 @@ from ..utilities.logger import time_print
 from ..managers.excel_manager import ExcelManager
 from ..services.hide_stuff import hide_stuff
 from ..utilities.await_element_text_change import await_element_text_change
+from time import sleep
 
 
 
@@ -52,6 +53,7 @@ class Claw:
 
                     time_print("Clicked the 'ok' button.")
                     # Wait for the prize name element to be present and retrieve its text
+                    sleep(2)
                     prize_name_element = await_element_text_change(
                         self.driver, By.ID, "prize-name", ["Name"], 10
                     )
@@ -74,6 +76,8 @@ class Claw:
                 return
         except Exception as e:
             time_print(f"Error checking cooldown or claiming prize. Message: {e}")
+        finally:
+            self.driver.quit()
 
     def pick_hero(self):
         self.driver.get("https://risinghub.net/claw")

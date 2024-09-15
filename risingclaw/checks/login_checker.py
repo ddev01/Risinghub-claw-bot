@@ -39,4 +39,6 @@ class LoginChecker:
                 return True
         except TimeoutException:
             time_print("No login error message found within 3 seconds.")
+        finally:
+            self.driver.quit()
         return False

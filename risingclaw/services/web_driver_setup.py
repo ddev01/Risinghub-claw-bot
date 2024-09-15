@@ -15,6 +15,6 @@ class WebDriverSetup:
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--headless")
-        options.binary_location = '/opt/firefox-128.0a1/firefox'
+        options.binary_location = '/opt/firefox/firefox'
         service = Service(executable_path='/usr/local/bin/geckodriver')
         return webdriver.Firefox(service=service, options=options)

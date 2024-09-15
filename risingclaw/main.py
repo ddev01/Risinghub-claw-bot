@@ -18,3 +18,4 @@ if __name__ == "__main__":
         selenium_checks.run_check()
     except Exception as e:
         time_print(f"An error occurred in the main execution. Message: {e}")
+		
