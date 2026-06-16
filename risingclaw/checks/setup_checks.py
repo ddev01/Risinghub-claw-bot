@@ -1,21 +1,28 @@
-from os import getenv
+from ..config import load_config
+from ..errors import ClawError
+from ..managers.prize_log import PrizeLog
 from ..utilities.logger import time_print
-from ..managers.excel_manager import ExcelManager
 
 
 class SetupChecks:
     def __init__(self):
-        self.excel_manager = ExcelManager()
+        try:
+            self.config = load_config()
+        except ValueError as exc:
+            raise ClawError(str(exc)) from exc
+        self.prize_log = PrizeLog(self.config)
 
-    def do_env_login_variables_exist(self):
+    def run(self) -> None:
+        self.do_env_login_variables_exist()
+        self.check_prize_log()
+
+    def do_env_login_variables_exist(self) -> None:
         time_print("Checking if environment variables exist")
-        if getenv("USERNAME") and getenv("PASSWORD"):
+        if self.config.username and self.config.password and self.config.base_url:
             time_print("Environment variables exist")
-        else:
-            time_print("Environment variables do not exist")
-            time_print("Please enter username and password in .env file")
-            exit(0)
+            return
+        raise ClawError("Please set BASE_URL, USERNAME, and PASSWORD in the .env file.")
 
-    def check_excel_file(self):
-        time_print("Checking if Excel log file exists and is initialized")
-        self.excel_manager.ensure_excel_file_exists()
+    def check_prize_log(self) -> None:
+        time_print("Checking if prize log exists and is initialized")
+        self.prize_log.ensure_exists()
