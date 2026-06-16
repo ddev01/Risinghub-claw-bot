@@ -1,0 +1,16 @@
+[Unit]
+Description=Rising Claw Bot daily run
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/path/to/Risinghub-claw-bot
+EnvironmentFile=/path/to/Risinghub-claw-bot/.env
+Environment=TZ=Europe/Amsterdam
+ExecStart=/path/to/Risinghub-claw-bot/venv/bin/python -m risingclaw.main
+StandardOutput=append:/path/to/Risinghub-claw-bot/cron.log
+StandardError=append:/path/to/Risinghub-claw-bot/cron.log
+
+[Install]
+WantedBy=multi-user.target
