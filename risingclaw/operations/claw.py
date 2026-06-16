@@ -1,128 +1,172 @@
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from os import getenv, environ
-from ..utilities.logger import time_print
-from ..managers.excel_manager import ExcelManager
-from ..services.hide_stuff import hide_stuff
-from ..utilities.await_element_text_change import await_element_text_change
-from time import sleep
+import json
+import re
+from os.path import exists
 
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+
+from ..config import Config, load_config
+from ..errors import BrowserError
+from ..managers.prize_log import PrizeLog
+from ..services.hide_stuff import hide_stuff
+from ..utilities.debug_artifacts import save_failure_artifacts
+from ..utilities.logger import time_print
 
 
 class Claw:
-    def __init__(self, driver, excel_manager):
-        self.driver = driver
-        self.excel_manager = excel_manager
+    def __init__(self, page: Page, prize_log: PrizeLog, config: Config | None = None):
+        self.page = page
+        self.prize_log = prize_log
+        self.config = config or load_config()
 
-    def claim_prize(self, hero):
+    def claim_prize(self, hero: str) -> None:
         time_print(f"Claiming prize for {hero}")
-        hide_stuff(self.driver)
+        hide_stuff(self.page)
         try:
-            timeout_element = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located(
-                    (By.XPATH, '//*[@id="countdown-container"]/h3')
-                )
-            )
-            # Execute JavaScript to get the text content directly
-            timeout = self.driver.execute_script(
-                "return arguments[0].textContent.trim();", timeout_element
-            )
-            if timeout == "00 : 00 : 00":
-                time_print("No cooldown. Proceeding to claim prize.")
-                try:
-                    # Code to execute when there is no cooldown
-                    speed_claw_button = WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable((By.XPATH, '//*[@id="speedclaw"]'))
-                    )
-                    speed_claw_button.click()
+            self._wait_for_claw_ready()
+            timeout = self._read_cooldown()
+            time_print(f"Cooldown timer: {timeout!r}")
 
-                    hero_card_button = WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable(
-                            (By.XPATH, '//*[contains(text(), "' + hero + '")]')
-                        )
-                    )
-                    hero_card_button.click()
-
-                    ok_button = WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable(
-                            (By.XPATH, "//div[@id='button' and @onclick='start();']")
-                        )
-                    )
-                    ok_button.click()
-
-                    time_print("Clicked the 'ok' button.")
-                    # Wait for the prize name element to be present and retrieve its text
-                    sleep(2)
-                    prize_name_element = await_element_text_change(
-                        self.driver, By.ID, "prize-name", ["Name"], 10
-                    )
-                    prize_name_text = prize_name_element.text if prize_name_element else "No Prize Name Found"
-
-                    prize_info_element = await_element_text_change(
-                        self.driver, By.ID, "prize-info", ["Info"], 10
-                    )
-                    prize_info_text = prize_info_element.text if prize_info_element else "No Prize Info Found"
-
-                    time_print(f"Prize name: {prize_name_text}")
-                    time_print(f"Prize info: {prize_info_text}")
-                    self.excel_manager.log_to_excel(
-                        hero, prize_name_text, prize_info_text
-                    )
-                except Exception as e:
-                    time_print(f"Error during prize claim process. Message: {e}")
-            else:
+            if not self._cooldown_is_clear(timeout):
                 time_print(f"Prize already claimed today. Cooldown active. {timeout}")
                 return
-        except Exception as e:
-            time_print(f"Error checking cooldown or claiming prize. Message: {e}")
-        finally:
-            self.driver.quit()
 
-    def pick_hero(self):
-        self.driver.get("https://risinghub.net/claw")
-        time_print("Picking heroe")
-        heroes = getenv("HEROES")
+            time_print("No cooldown. Proceeding to claim prize.")
+            self.page.locator("#speedclaw").click(timeout=10_000)
+            self.page.wait_for_timeout(500)
+
+            self.page.locator(".hero-claw").filter(
+                has=self.page.locator(".hero-content div", has_text=hero)
+            ).first.click(timeout=10_000)
+            self.page.locator("#button div").filter(has_text="ok").wait_for(
+                state="attached",
+                timeout=10_000,
+            )
+            time_print("Hero selected, clicking start.")
+            self.page.locator("#button").click(timeout=10_000)
+
+            self._wait_for_prize_result()
+            prize_name_text = self._read_element_text("#prize-name")
+            prize_info_text = self._read_element_text("#prize-info")
+
+            time_print(f"Prize name: {prize_name_text}")
+            time_print(f"Prize info: {prize_info_text}")
+            self.prize_log.append(hero, prize_name_text, prize_info_text)
+        except PlaywrightTimeoutError as exc:
+            save_failure_artifacts(self.page, "claim-prize-timeout")
+            raise BrowserError(f"Error during prize claim process: {exc}") from exc
+        except Exception as exc:
+            save_failure_artifacts(self.page, "claim-prize-error")
+            raise BrowserError(f"Error checking cooldown or claiming prize: {exc}") from exc
+
+    def _wait_for_claw_ready(self) -> None:
+        self.page.locator("#claw-container").wait_for(state="attached", timeout=10_000)
+        self.page.locator("#speedclaw").wait_for(state="visible", timeout=10_000)
+        self.page.wait_for_function("() => typeof jQuery !== 'undefined'", timeout=10_000)
+
+    def _read_cooldown(self) -> str:
+        self.page.locator("#countdown-container h3").wait_for(state="attached", timeout=10_000)
+        for _ in range(10):
+            text = self._read_element_text("#countdown-container h3")
+            if re.search(r"\d+\s*:\s*\d+\s*:\s*\d+", text):
+                return text
+            self.page.wait_for_timeout(500)
+
+        countdown_visible = self.page.evaluate(
+            """
+            () => {
+                const container = document.querySelector('#countdown-container');
+                return container && container.style.visibility === 'visible';
+            }
+            """
+        )
+        if not countdown_visible:
+            return "00 : 00 : 00"
+        raise BrowserError("Countdown timer did not load.")
+
+    def _cooldown_is_clear(self, timeout: str) -> bool:
+        parts = [part.strip() for part in timeout.split(":")]
+        if len(parts) != 3 or not all(part.isdigit() for part in parts):
+            raise BrowserError(f"Unexpected countdown format: {timeout!r}")
+        return all(part == "00" for part in parts)
+
+    def _wait_for_prize_result(self) -> None:
+        self.page.wait_for_function(
+            """
+            () => {
+                const container = document.querySelector('#prize-container');
+                const prizeName = document.querySelector('#prize-name');
+                if (!container || !prizeName) {
+                    return false;
+                }
+                const name = prizeName.textContent.trim();
+                return container.style.visibility === 'visible'
+                    && name.length > 0
+                    && name !== 'Name';
+            }
+            """,
+            timeout=30_000,
+        )
+
+    def _read_element_text(self, selector: str) -> str:
+        return self.page.evaluate(
+            """
+            (selector) => document.querySelector(selector)?.textContent.trim() ?? ''
+            """,
+            selector,
+        )
+
+    def pick_hero(self) -> str:
+        self.page.goto(self.config.claw_url)
+        self._wait_for_claw_ready()
+        time_print("Picking hero")
+
+        heroes = self._heroes_from_env()
         if heroes:
-            heroes = heroes.split(",")
-            time_print(f"Heroes in .env: {heroes}")
-            last_entry = self.excel_manager.read_last_prize()
+            time_print(f"Heroes in env: {heroes}")
+            last_entry = self.prize_log.read_last()
             if last_entry:
                 time_print(
-                    f"Last entry: {last_entry['date']} {last_entry['time']} {last_entry['hero']} {last_entry['prize']}"
+                    "Last entry: "
+                    f"{last_entry['date']} {last_entry['time']} "
+                    f"{last_entry['hero']} {last_entry['prize']}"
                 )
                 if last_entry["hero"] in heroes:
                     current_index = heroes.index(last_entry["hero"])
                     next_index = (current_index + 1) % len(heroes)
                     return heroes[next_index]
-                else:
-                    time_print(
-                        "Last entry hero was not found in env heroes. User probably removed the hero from the env file."
-                    )
-                    return heroes[0]
-            else:
-                time_print("Excel only contains headers. This is the first run.")
+                time_print(
+                    "Last entry hero was not found in env heroes. "
+                    "User probably removed the hero from the env file."
+                )
                 return heroes[0]
-        else:
-            time_print("No heroes found in .env file")
-            time_print("Fetching heroes from the claw.")
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.ID, "heroes-container"))
-            )
-            heroes_container = self.driver.find_element(By.ID, "heroes-container")
-            hero_elements = heroes_container.find_elements(
-                By.CSS_SELECTOR, ".hero-claw .hero-content div:first-child"
-            )
-            options = [hero.text for hero in hero_elements]
-            print("Fetched heroes:", options)
-            self.update_env_file(options)
-            return options[0]
+            time_print("Prize log only contains headers. This is the first run.")
+            return heroes[0]
 
-    def update_env_file(self, heroes):
-        time_print("Updating .env file with new heroes")
-        with open(".env", "a") as env_file:
-            heroes_value = ",".join(heroes)
-            env_file.write(f"\nHEROES={heroes_value}")
-        environ["HEROES"] = (
-            heroes_value  # Update the environment variable for the current session
-        )
+        time_print("No heroes found in env file")
+        time_print("Fetching heroes from the claw.")
+        self.page.locator("#heroes-container").wait_for(timeout=10_000)
+        options = self.page.locator(
+            ".hero-claw .hero-content div:first-child"
+        ).all_inner_texts()
+        options = [hero.strip() for hero in options if hero.strip()]
+        if not options:
+            save_failure_artifacts(self.page, "no-heroes-found")
+            raise BrowserError("No heroes found on the claw page.")
+        time_print(f"Fetched heroes: {options}")
+        self.save_heroes(options)
+        return options[0]
+
+    def _heroes_from_env(self) -> list[str] | None:
+        if self.config.heroes:
+            return [hero.strip() for hero in self.config.heroes.split(",") if hero.strip()]
+        if exists(self.config.heroes_path):
+            with open(self.config.heroes_path, encoding="utf-8") as file:
+                data = json.load(file)
+            heroes = data.get("heroes", [])
+            return [hero.strip() for hero in heroes if hero.strip()]
+        return None
+
+    def save_heroes(self, heroes: list[str]) -> None:
+        time_print("Saving heroes list")
+        with open(self.config.heroes_path, "w", encoding="utf-8") as file:
+            json.dump({"heroes": heroes}, file, indent=2)
