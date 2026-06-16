@@ -4,3 +4,4 @@ data/
 __pycache__
 todo.txt
 cron.log
+data/debug/
