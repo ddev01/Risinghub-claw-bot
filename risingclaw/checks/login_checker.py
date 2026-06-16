@@ -1,44 +1,37 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+
+from ..config import Config, load_config
+from ..errors import LoginError
+from ..utilities.debug_artifacts import save_failure_artifacts
 from ..utilities.logger import time_print
 
 
 class LoginChecker:
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
+    def __init__(self, page: Page, config: Config | None = None):
+        self.page = page
+        self.config = config or load_config()
 
-    def check_login_status(self):
+    def check_login_status(self) -> bool:
         time_print("Checking login status")
         try:
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.ID, "main-nav"))
-            )
-            self.driver.find_element(
-                By.XPATH,
-                "//nav[@id='main-nav']//a[@href='https://risinghub.net/profile']",
-            )
+            self.page.locator("#main-nav").wait_for(timeout=10_000)
+            self.page.locator(
+                f"nav#main-nav a[href='{self.config.profile_url}']"
+            ).first.wait_for(state="visible", timeout=10_000)
             time_print("Logged in!")
             return True
-        except Exception as e:
-            time_print(f"Login status check failed. Message: {e}")
+        except PlaywrightTimeoutError as exc:
+            time_print(f"Login status check failed. Message: {exc}")
             return False
 
-    def check_wrong_login(self):
+    def check_wrong_login(self) -> None:
         time_print("Checking for login errors")
         try:
-            # Wait for the error message to be visible up to 3 seconds
-            error_message_element = WebDriverWait(self.driver, 3).until(
-                EC.visibility_of_element_located((By.CSS_SELECTOR, ".alert.callout p"))
-            )
-            error_message = error_message_element.text
+            error_message = self.page.locator(".alert.callout p").inner_text(timeout=3_000)
             if error_message:
-                time_print(f"Login error detected: {error_message}")
-                return True
-        except TimeoutException:
+                save_failure_artifacts(self.page, "wrong-login")
+                raise LoginError(f"Login error detected: {error_message}")
+        except PlaywrightTimeoutError:
             time_print("No login error message found within 3 seconds.")
-        finally:
-            self.driver.quit()
-        return False
+            save_failure_artifacts(self.page, "login-status-unknown")
+            raise LoginError("Login failed without a visible error message.")

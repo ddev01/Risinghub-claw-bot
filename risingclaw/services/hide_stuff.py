@@ -1,10 +1,18 @@
-from selenium.webdriver.remote.webdriver import WebDriver
+from playwright.sync_api import Page
 
-def hide_stuff(driver: WebDriver):
-    hide_script = """
-    var ads = document.querySelectorAll('.adsbygoogle');
-    ads.forEach(function(el) { el.style.display = 'none'; });
-    var iframes = document.querySelectorAll('iframe');
-    iframes.forEach(function(el) { el.style.display = 'none'; });
-    """
-    driver.execute_script(hide_script)
+from ..config import Config, load_config
+
+
+def hide_stuff(page: Page) -> None:
+    page.evaluate(
+        """
+        () => {
+            document.querySelectorAll('.adsbygoogle').forEach((el) => {
+                el.style.display = 'none';
+            });
+            document.querySelectorAll('iframe').forEach((el) => {
+                el.style.display = 'none';
+            });
+        }
+        """
+    )

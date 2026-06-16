@@ -1,58 +1,50 @@
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
-from os import getenv
-from ..utilities.logger import time_print
-from ..services.hide_stuff import hide_stuff
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
+from ..config import Config, load_config
+from ..errors import LoginError
+from ..services.hide_stuff import hide_stuff
+from ..utilities.debug_artifacts import save_failure_artifacts
+from ..utilities.logger import time_print
 
 
 class Authentication:
-    def __init__(self, driver):
+    def __init__(self, page: Page, config: Config | None = None):
         time_print("Initializing Authentication")
-        self.driver = driver
-        self.env_user, self.env_password = self.load_env()
+        self.page = page
+        self.config = config or load_config()
 
-    @staticmethod
-    def load_env():
-        time_print("Loading environment variables")
-        return getenv("USERNAME"), getenv("PASSWORD")
-
-    def login(self):
+    def login(self) -> None:
         time_print("Performing login")
-        self.driver.get("https://risinghub.net/login")
-        hide_stuff(self.driver)
-        self.accept_consent()
         try:
-            username_field = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.NAME, "username"))
-            )
-            password_field = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.NAME, "password"))
-            )
-            submit_button = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.NAME, "submit"))
-            )
-            username_field.send_keys(self.env_user)
-            password_field.send_keys(self.env_password)
-            submit_button.click()
-        except TimeoutException as e:
-            time_print(f"Timeout during login. Message: {e.msg}")
-            self.driver.quit()
-            exit(1)
+            self.page.goto(self.config.login_url)
+            hide_stuff(self.page)
+            self.accept_consent()
 
-    def accept_consent(self):
+            username_field = self.page.locator('input[name="username"]')
+            password_field = self.page.locator('input[name="password"]')
+            username_field.wait_for(state="visible", timeout=10_000)
+
+            username_field.fill(self.config.username)
+            password_field.fill(self.config.password)
+
+            submit_button = self.page.locator(
+                'button[name="submit"], input[name="submit"], form button[type="submit"]'
+            )
+            submit_button.first.click(timeout=10_000)
+            self.page.wait_for_load_state("domcontentloaded")
+        except PlaywrightTimeoutError as exc:
+            save_failure_artifacts(self.page, "login-timeout")
+            raise LoginError(f"Timeout during login: {exc}") from exc
+        except Exception as exc:
+            save_failure_artifacts(self.page, "login-error")
+            raise LoginError(f"Login failed: {exc}") from exc
+
+    def accept_consent(self) -> None:
         time_print("Accepting consent on the webpage")
         try:
-            consent_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        "//p[@class='fc-button-label' and contains(text(), 'Consent')]",
-                    )
-                )
-            )
-            consent_button.click()
-        except TimeoutException as e:
-            time_print(f"Consent button not found or not clickable. Message: {e.msg}")
+            self.page.locator(
+                "p.fc-button-label",
+                has_text="Consent",
+            ).click(timeout=10_000)
+        except PlaywrightTimeoutError as exc:
+            time_print(f"Consent button not found or not clickable. Message: {exc}")

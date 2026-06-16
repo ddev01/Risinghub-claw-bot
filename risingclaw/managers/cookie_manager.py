@@ -1,35 +1,23 @@
-from selenium import webdriver
-from pickle import load, dump
-from os import path
-from ..utilities.logger import time_print
-from time import sleep
-from selenium.webdriver.support.ui import WebDriverWait
+from os.path import exists
 
+from playwright.sync_api import Browser, BrowserContext
+
+from ..config import Config, load_config
+from ..utilities.logger import time_print
 
 
 class CookieManager:
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
-        self.cookies_path = "data/cookie.pkl"
+    def __init__(self, config: Config | None = None):
+        self.config = config or load_config()
+        self.cookies_path = self.config.cookies_path
 
-    def save_cookies(self):
+    def has_cookies(self) -> bool:
+        return exists(self.cookies_path)
+
+    def save(self, context: BrowserContext) -> None:
         time_print("Saving cookies")
-        with open(self.cookies_path, "wb") as file:
-            dump(self.driver.get_cookies(), file)
+        context.storage_state(path=self.cookies_path)
 
-    def load_cookies(self):
+    def load_context(self, browser: Browser) -> BrowserContext:
         time_print("Loading cookies")
-        if path.exists(self.cookies_path):
-            self.driver.get("https://risinghub.net")
-            with open(self.cookies_path, "rb") as file:
-                cookies = load(file)
-                for cookie in cookies:
-                    self.driver.add_cookie(cookie)
-            sleep(1)
-            #For some reason requires 2 refreshes for the cookies to load properly.
-            self.driver.refresh()
-            WebDriverWait(self.driver, 10).until(
-                lambda d: d.execute_script('return document.readyState') == 'complete')
-            self.driver.refresh()
-            return True
-        return False
+        return browser.new_context(storage_state=self.cookies_path)
