@@ -6,13 +6,6 @@ from ..account import AccountConfig
 from ..utilities.logger import time_print
 
 
-def _accounts_path(app_config) -> str:
-    path = getattr(app_config, "accounts_path", None)
-    if path:
-        return path
-    return f"{app_config.data_dir}/accounts.json"
-
-
 def _require_str(entry: dict, field: str, source: str, index: int) -> str:
     value = entry.get(field)
     if not isinstance(value, str) or not value.strip():
@@ -54,7 +47,7 @@ def _parse_account(entry: dict, app_config, source: str, index: int) -> AccountC
 
 
 def load_accounts(app_config) -> list[AccountConfig]:
-    path = _accounts_path(app_config)
+    path = app_config.accounts_path
 
     if not exists(path):
         time_print(

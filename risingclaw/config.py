@@ -26,18 +26,6 @@ class AppConfig:
     discord_webhook: str | None
 
     @property
-    def login_url(self) -> str:
-        return f"{self.base_url.rstrip('/')}/login"
-
-    @property
-    def claw_url(self) -> str:
-        return f"{self.base_url.rstrip('/')}/claw"
-
-    @property
-    def profile_url(self) -> str:
-        return f"{self.base_url.rstrip('/')}/profile"
-
-    @property
     def accounts_path(self) -> str:
         return f"{self.data_dir}/accounts.json"
 
