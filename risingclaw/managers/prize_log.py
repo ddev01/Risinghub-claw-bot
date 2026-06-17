@@ -2,14 +2,14 @@ import json
 from datetime import datetime
 from os.path import exists
 
-from ..config import Config, load_config
+from ..account import AccountConfig
 from ..utilities.logger import time_print
 
 
 class PrizeLog:
-    def __init__(self, config: Config | None = None):
-        self.config = config or load_config()
-        self.path = self.config.log_path
+    def __init__(self, account: AccountConfig):
+        self.account = account
+        self.path = account.log_path
 
     def ensure_exists(self) -> None:
         if not exists(self.path):
@@ -22,6 +22,7 @@ class PrizeLog:
         entry = {
             "date": now.strftime("%Y-%m-%d"),
             "time": now.strftime("%H:%M:%S"),
+            "account": self.account.id,
             "hero": hero,
             "prize": prize,
             "quantity": quantity,
@@ -32,10 +33,13 @@ class PrizeLog:
         self._write_all(entries)
 
     def read_last(self) -> dict | None:
-        entries = self._read_all()
+        entries = self._entries_for_account(self._read_all())
         if not entries:
             return None
         return entries[-1]
+
+    def _entries_for_account(self, entries: list[dict]) -> list[dict]:
+        return [entry for entry in entries if entry.get("account") == self.account.id]
 
     def _read_all(self) -> list[dict]:
         if not exists(self.path):

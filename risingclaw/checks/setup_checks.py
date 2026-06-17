@@ -1,5 +1,6 @@
-from ..config import load_config
+from ..config import AppConfig, load_config
 from ..errors import ClawError
+from ..managers.account_store import ensure_account_dirs, load_accounts
 from ..managers.prize_log import PrizeLog
 from ..utilities.logger import time_print
 
@@ -7,22 +8,34 @@ from ..utilities.logger import time_print
 class SetupChecks:
     def __init__(self):
         try:
-            self.config = load_config()
+            self.config: AppConfig = load_config()
         except ValueError as exc:
             raise ClawError(str(exc)) from exc
-        self.prize_log = PrizeLog(self.config)
 
     def run(self) -> None:
-        self.do_env_login_variables_exist()
-        self.check_prize_log()
+        accounts = self.check_accounts()
+        self.check_prize_logs(accounts)
 
-    def do_env_login_variables_exist(self) -> None:
-        time_print("Checking if environment variables exist")
-        if self.config.username and self.config.password and self.config.base_url:
-            time_print("Environment variables exist")
-            return
-        raise ClawError("Please set BASE_URL, USERNAME, and PASSWORD in the .env file.")
+    def check_accounts(self):
+        time_print("Checking accounts configuration")
+        try:
+            accounts = load_accounts(self.config)
+        except ValueError as exc:
+            raise ClawError(str(exc)) from exc
 
-    def check_prize_log(self) -> None:
-        time_print("Checking if prize log exists and is initialized")
-        self.prize_log.ensure_exists()
+        if not accounts:
+            raise ClawError(
+                f"Missing or empty accounts file at '{self.config.accounts_path}'. "
+                "Copy accounts.example.json and configure at least one account."
+            )
+
+        for account in accounts:
+            ensure_account_dirs(account)
+
+        time_print(f"Loaded {len(accounts)} account(s)")
+        return accounts
+
+    def check_prize_logs(self, accounts) -> None:
+        time_print("Checking if prize logs exist and are initialized")
+        for account in accounts:
+            PrizeLog(account).ensure_exists()

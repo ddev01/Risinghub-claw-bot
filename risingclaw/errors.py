@@ -12,3 +12,7 @@ class LoginError(ClawError):
 
 class BrowserError(ClawError):
     """Raised when browser automation fails."""
+
+
+class ClawCooldownError(ClawError):
+    """Raised when the claw is still on cooldown; not a run failure."""

@@ -1,13 +1,19 @@
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
-from ..config import Config, load_config
+from ..account import AccountConfig
+from ..config import AppConfig, load_config
 from ..errors import BrowserError
 from ..utilities.logger import time_print
 
 
 class BrowserSession:
-    def __init__(self, config: Config | None = None):
-        self.config = config or load_config()
+    def __init__(
+        self,
+        app_config: AppConfig | None = None,
+        account: AccountConfig | None = None,
+    ):
+        self.config = app_config or load_config()
+        self.account = account
         self._playwright: Playwright | None = None
         self.browser: Browser | None = None
         self.context: BrowserContext | None = None

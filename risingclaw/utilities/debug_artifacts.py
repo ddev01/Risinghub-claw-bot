@@ -1,18 +1,31 @@
 from datetime import datetime
+from os import makedirs
 from os.path import join
 
 from playwright.sync_api import Page
 
+from ..account import AccountConfig
 from ..config import load_config
 from ..utilities.logger import time_print
 
 
-def save_failure_artifacts(page: Page, label: str) -> None:
-    config = load_config()
+def save_failure_artifacts(
+    page: Page,
+    label: str,
+    account: AccountConfig | None = None,
+) -> None:
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base_name = f"{timestamp}-{label}"
-    png_path = join(config.debug_dir, f"{base_name}.png")
-    html_path = join(config.debug_dir, f"{base_name}.html")
+    if account is not None:
+        debug_dir = account.debug_dir
+        base_name = f"{account.id}-{timestamp}-{label}"
+    else:
+        config = load_config()
+        debug_dir = f"{config.data_dir}/debug"
+        base_name = f"{timestamp}-{label}"
+
+    makedirs(debug_dir, exist_ok=True)
+    png_path = join(debug_dir, f"{base_name}.png")
+    html_path = join(debug_dir, f"{base_name}.html")
 
     try:
         page.screenshot(path=png_path, full_page=True)

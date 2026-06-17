@@ -1,16 +1,18 @@
 import pytz
 from datetime import datetime, timedelta
 
+from ..account import AccountConfig
 from ..managers.prize_log import PrizeLog
 
 
-def has_already_run() -> bool:
+def has_already_run(account: AccountConfig) -> bool:
     """
-    Check if the wheel has already been spun after 01:00 AM Amsterdam time today.
+    Check if the wheel has already been spun after 01:00 AM Amsterdam time today
+    for the given account.
 
     :return: True if already run today after 01:00 AM, False otherwise.
     """
-    prize_log = PrizeLog()
+    prize_log = PrizeLog(account)
     last_prize = prize_log.read_last()
 
     if last_prize is None:

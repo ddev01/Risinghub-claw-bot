@@ -2,14 +2,14 @@ from os.path import exists
 
 from playwright.sync_api import Browser, BrowserContext
 
-from ..config import Config, load_config
+from ..account import AccountConfig
 from ..utilities.logger import time_print
 
 
 class CookieManager:
-    def __init__(self, config: Config | None = None):
-        self.config = config or load_config()
-        self.cookies_path = self.config.cookies_path
+    def __init__(self, account: AccountConfig):
+        self.account = account
+        self.cookies_path = account.cookies_path
 
     def has_cookies(self) -> bool:
         return exists(self.cookies_path)

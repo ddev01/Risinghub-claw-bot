@@ -1,7 +1,5 @@
 from playwright.sync_api import Page
 
-from ..config import Config, load_config
-
 
 def hide_stuff(page: Page) -> None:
     page.evaluate(

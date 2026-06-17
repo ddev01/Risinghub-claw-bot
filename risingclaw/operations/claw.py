@@ -4,8 +4,8 @@ from os.path import exists
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
-from ..config import Config, load_config
-from ..errors import BrowserError, ClawError
+from ..account import AccountConfig
+from ..errors import BrowserError, ClawCooldownError, ClawError
 from ..managers.prize_log import PrizeLog
 from ..prize_result import PrizeResult
 from ..services.hide_stuff import hide_stuff
@@ -14,10 +14,10 @@ from ..utilities.logger import time_print
 
 
 class Claw:
-    def __init__(self, page: Page, prize_log: PrizeLog, config: Config | None = None):
+    def __init__(self, page: Page, prize_log: PrizeLog, account: AccountConfig):
         self.page = page
         self.prize_log = prize_log
-        self.config = config or load_config()
+        self.account = account
 
     def claim_prize(self, hero: str) -> PrizeResult:
         time_print(f"Claiming prize for {hero}")
@@ -28,7 +28,9 @@ class Claw:
             time_print(f"Cooldown timer: {timeout!r}")
 
             if not self._cooldown_is_clear(timeout):
-                raise ClawError(f"Claw on cooldown ({timeout}). No prize claimed.")
+                raise ClawCooldownError(
+                    f"Claw on cooldown ({timeout}). No prize claimed."
+                )
 
             time_print("No cooldown. Proceeding to claim prize.")
             self.page.locator("#speedclaw").click(timeout=10_000)
@@ -52,6 +54,7 @@ class Claw:
             time_print(f"Prize info: {prize_info_text}")
             self.prize_log.append(hero, prize_name_text, prize_info_text)
             return PrizeResult(
+                account_id=self.account.id,
                 hero=hero,
                 prize=prize_name_text,
                 quantity=prize_info_text,
@@ -59,10 +62,10 @@ class Claw:
         except ClawError:
             raise
         except PlaywrightTimeoutError as exc:
-            save_failure_artifacts(self.page, "claim-prize-timeout")
+            save_failure_artifacts(self.page, "claim-prize-timeout", self.account)
             raise BrowserError(f"Error during prize claim process: {exc}") from exc
         except Exception as exc:
-            save_failure_artifacts(self.page, "claim-prize-error")
+            save_failure_artifacts(self.page, "claim-prize-error", self.account)
             raise BrowserError(f"Error checking cooldown or claiming prize: {exc}") from exc
 
     def _wait_for_claw_ready(self) -> None:
@@ -123,13 +126,13 @@ class Claw:
         )
 
     def pick_hero(self) -> str:
-        self.page.goto(self.config.claw_url)
+        self.page.goto(self.account.claw_url)
         self._wait_for_claw_ready()
         time_print("Picking hero")
 
-        heroes = self._heroes_from_env()
+        heroes = self._heroes_from_account()
         if heroes:
-            time_print(f"Heroes in env: {heroes}")
+            time_print(f"Heroes for account: {heroes}")
             last_entry = self.prize_log.read_last()
             if last_entry:
                 time_print(
@@ -142,14 +145,14 @@ class Claw:
                     next_index = (current_index + 1) % len(heroes)
                     return heroes[next_index]
                 time_print(
-                    "Last entry hero was not found in env heroes. "
-                    "User probably removed the hero from the env file."
+                    "Last entry hero was not found in configured heroes. "
+                    "User probably removed the hero from the account config."
                 )
                 return heroes[0]
-            time_print("Prize log only contains headers. This is the first run.")
+            time_print("Prize log is empty. This is the first run.")
             return heroes[0]
 
-        time_print("No heroes found in env file")
+        time_print("No heroes configured for account")
         time_print("Fetching heroes from the claw.")
         self.page.locator("#heroes-container").wait_for(timeout=10_000)
         options = self.page.locator(
@@ -157,17 +160,17 @@ class Claw:
         ).all_inner_texts()
         options = [hero.strip() for hero in options if hero.strip()]
         if not options:
-            save_failure_artifacts(self.page, "no-heroes-found")
+            save_failure_artifacts(self.page, "no-heroes-found", self.account)
             raise BrowserError("No heroes found on the claw page.")
         time_print(f"Fetched heroes: {options}")
         self.save_heroes(options)
         return options[0]
 
-    def _heroes_from_env(self) -> list[str] | None:
-        if self.config.heroes:
-            return [hero.strip() for hero in self.config.heroes.split(",") if hero.strip()]
-        if exists(self.config.heroes_path):
-            with open(self.config.heroes_path, encoding="utf-8") as file:
+    def _heroes_from_account(self) -> list[str] | None:
+        if self.account.heroes:
+            return [hero.strip() for hero in self.account.heroes if hero.strip()]
+        if exists(self.account.heroes_path):
+            with open(self.account.heroes_path, encoding="utf-8") as file:
                 data = json.load(file)
             heroes = data.get("heroes", [])
             return [hero.strip() for hero in heroes if hero.strip()]
@@ -175,5 +178,5 @@ class Claw:
 
     def save_heroes(self, heroes: list[str]) -> None:
         time_print("Saving heroes list")
-        with open(self.config.heroes_path, "w", encoding="utf-8") as file:
+        with open(self.account.heroes_path, "w", encoding="utf-8") as file:
             json.dump({"heroes": heroes}, file, indent=2)
