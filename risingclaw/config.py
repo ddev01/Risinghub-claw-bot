@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from os import getenv, makedirs
-from os.path import exists
 
 
 def _require(name: str) -> str:
@@ -18,11 +17,8 @@ def _bool(name: str, default: bool) -> bool:
 
 
 @dataclass(frozen=True)
-class Config:
+class AppConfig:
     base_url: str
-    username: str
-    password: str
-    heroes: str | None
     headless: bool
     browser: str
     data_dir: str
@@ -42,32 +38,19 @@ class Config:
         return f"{self.base_url.rstrip('/')}/profile"
 
     @property
-    def log_path(self) -> str:
-        return f"{self.data_dir}/log.json"
-
-    @property
-    def cookies_path(self) -> str:
-        return f"{self.data_dir}/cookies.json"
-
-    @property
-    def heroes_path(self) -> str:
-        return f"{self.data_dir}/heroes.json"
-
-    @property
-    def debug_dir(self) -> str:
-        return f"{self.data_dir}/debug"
+    def accounts_path(self) -> str:
+        return f"{self.data_dir}/accounts.json"
 
     def ensure_data_dir(self) -> None:
         makedirs(self.data_dir, exist_ok=True)
-        makedirs(self.debug_dir, exist_ok=True)
 
 
-def load_config() -> Config:
-    config = Config(
+Config = AppConfig
+
+
+def load_config() -> AppConfig:
+    config = AppConfig(
         base_url=_require("BASE_URL").rstrip("/"),
-        username=_require("USERNAME"),
-        password=_require("PASSWORD"),
-        heroes=getenv("HEROES"),
         headless=_bool("HEADLESS", True),
         browser=getenv("BROWSER", "chromium"),
         data_dir=getenv("DATA_DIR", "data"),
