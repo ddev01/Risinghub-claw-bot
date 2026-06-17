@@ -5,9 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=ddev
+Group=ddev
 WorkingDirectory=/path/to/Risinghub-claw-bot
 EnvironmentFile=/path/to/Risinghub-claw-bot/.env
 Environment=TZ=Europe/Amsterdam
+Environment=HOME=/home/ddev
 ExecStart=/path/to/Risinghub-claw-bot/venv/bin/python -m risingclaw.main
 StandardOutput=append:/path/to/Risinghub-claw-bot/cron.log
 StandardError=append:/path/to/Risinghub-claw-bot/cron.log

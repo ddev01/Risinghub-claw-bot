@@ -1,8 +1,8 @@
 [Unit]
-Description=Run Rising Claw Bot daily at 01:05 Amsterdam time
+Description=Run Rising Claw Bot daily at 02:05 Amsterdam time
 
 [Timer]
-OnCalendar=*-*-* 01:05:00
+OnCalendar=*-*-* 02:05:00
 Persistent=true
 Unit=risingclaw.service
 

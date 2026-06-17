@@ -1,4 +1,4 @@
-# Run daily at 01:05 Amsterdam time.
+# Run daily at 02:05 Amsterdam time.
 # Replace /path/to/Risinghub-claw-bot and venv paths before installing:
 #   crontab -e
-5 1 * * * TZ=Europe/Amsterdam cd /path/to/Risinghub-claw-bot && /path/to/Risinghub-claw-bot/venv/bin/python -m risingclaw.main >> /path/to/Risinghub-claw-bot/cron.log 2>&1
+5 2 * * * TZ=Europe/Amsterdam cd /path/to/Risinghub-claw-bot && /path/to/Risinghub-claw-bot/venv/bin/python -m risingclaw.main >> /path/to/Risinghub-claw-bot/cron.log 2>&1
