@@ -20,7 +20,7 @@ class ClawRunner:
         self.app_config = app_config
         self.account = account
 
-        self.session = BrowserSession(app_config, account)
+        self.session = BrowserSession(app_config)
         self.prize_log = PrizeLog(account)
         self.cookie_manager = CookieManager(account)
         self.page: Page | None = None
@@ -28,35 +28,27 @@ class ClawRunner:
     def run(self) -> PrizeResult:
         time_print(f"Running claw automation for [{self.account.id}]")
         try:
-            _, context, page = self.session.start()
+            storage_state = self.cookie_manager.storage_state_path
+            _, context, page = self.session.start(storage_state=storage_state)
             self.page = page
 
-            if self.cookie_manager.has_cookies():
-                context.close()
-                context = self.cookie_manager.load_context(self.session.browser)
-                self.session.context = context
-                page = context.new_page()
-                self.session.page = page
-                self.page = page
-                self._prime_cookie_session(page)
+            if storage_state is not None:
+                page.goto(self.app_config.base_url)
+                page.wait_for_load_state("domcontentloaded")
 
             auth = Authentication(page, self.account)
             login_checker = LoginChecker(page, self.account)
             claw = Claw(page, self.prize_log, self.account)
 
-            if self.cookie_manager.has_cookies():
+            logged_in = login_checker.check_login_status() if storage_state else False
+            if not logged_in:
+                auth.login()
                 if not login_checker.check_login_status():
-                    auth.login()
-                    self.cookie_manager.save(context)
-                return self._execute_claw(claw)
-
-            auth.login()
-            if login_checker.check_login_status():
+                    login_checker.check_wrong_login()
+                    raise ClawError("Login failed without a visible error message.")
                 self.cookie_manager.save(context)
-                return self._execute_claw(claw)
 
-            login_checker.check_wrong_login()
-            raise ClawError("Login failed without a visible error message.")
+            return self._execute_claw(claw)
         except ClawError:
             raise
         except Exception as exc:
@@ -65,13 +57,6 @@ class ClawRunner:
             raise ClawError(f"Claw automation failed: {exc}") from exc
         finally:
             self.session.stop()
-
-    def _prime_cookie_session(self, page: Page) -> None:
-        page.goto(self.app_config.base_url)
-        page.reload()
-        page.wait_for_load_state("domcontentloaded")
-        page.reload()
-        page.wait_for_load_state("domcontentloaded")
 
     def _execute_claw(self, claw: Claw) -> PrizeResult:
         time_print("Executing Claw operations")
