@@ -5,15 +5,18 @@ from dotenv import load_dotenv
 
 load_dotenv(verbose=True, override=True)
 
+from .checks.already_ran import has_already_run
 from .checks.setup_checks import SetupChecks
-from .errors import AlreadyRanError, ClawError
+from .config import load_config
+from .errors import ClawCooldownError, ClawError
+from .managers.account_store import load_accounts
 from .operations.claw_runner import ClawRunner
 from .services.discord_notifier import DiscordNotifier
 from .utilities.logger import time_print
 
 
-def _notify_error(notifier: DiscordNotifier, exc: BaseException) -> None:
-    message = str(exc).strip() or exc.__class__.__name__
+def _notify_error(notifier: DiscordNotifier, exc: BaseException | str) -> None:
+    message = str(exc).strip() or (exc.__class__.__name__ if isinstance(exc, BaseException) else "Unknown error")
     if not isinstance(exc, ClawError):
         trace = traceback.format_exc().strip()
         if trace:
@@ -25,12 +28,24 @@ if __name__ == "__main__":
     notifier = DiscordNotifier.from_config()
     try:
         time_print("Starting main execution")
+        app_config = load_config()
         SetupChecks().run()
-        result = ClawRunner().run()
-        notifier.notify_success(result)
-    except AlreadyRanError as exc:
-        time_print(str(exc))
-        sys.exit(0)
+        accounts = load_accounts(app_config)
+        failures: list[str] = []
+        for account in accounts:
+            if has_already_run(account):
+                time_print(f"[{account.id}] Already ran today. Skipping.")
+                continue
+            try:
+                result = ClawRunner(app_config, account).run()
+                notifier.notify_success(result, account.id)
+            except ClawCooldownError as exc:
+                time_print(f"[{account.id}] {exc}")
+            except ClawError as exc:
+                failures.append(account.id)
+                time_print(f"[{account.id}] {exc}")
+                _notify_error(notifier, f"[{account.id}] {exc}")
+        sys.exit(1 if failures else 0)
     except ClawError as exc:
         time_print(str(exc))
         _notify_error(notifier, exc)
