@@ -5,8 +5,9 @@ from os.path import exists
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from ..config import Config, load_config
-from ..errors import BrowserError
+from ..errors import BrowserError, ClawError
 from ..managers.prize_log import PrizeLog
+from ..prize_result import PrizeResult
 from ..services.hide_stuff import hide_stuff
 from ..utilities.debug_artifacts import save_failure_artifacts
 from ..utilities.logger import time_print
@@ -18,7 +19,7 @@ class Claw:
         self.prize_log = prize_log
         self.config = config or load_config()
 
-    def claim_prize(self, hero: str) -> None:
+    def claim_prize(self, hero: str) -> PrizeResult:
         time_print(f"Claiming prize for {hero}")
         hide_stuff(self.page)
         try:
@@ -27,8 +28,7 @@ class Claw:
             time_print(f"Cooldown timer: {timeout!r}")
 
             if not self._cooldown_is_clear(timeout):
-                time_print(f"Prize already claimed today. Cooldown active. {timeout}")
-                return
+                raise ClawError(f"Claw on cooldown ({timeout}). No prize claimed.")
 
             time_print("No cooldown. Proceeding to claim prize.")
             self.page.locator("#speedclaw").click(timeout=10_000)
@@ -51,6 +51,13 @@ class Claw:
             time_print(f"Prize name: {prize_name_text}")
             time_print(f"Prize info: {prize_info_text}")
             self.prize_log.append(hero, prize_name_text, prize_info_text)
+            return PrizeResult(
+                hero=hero,
+                prize=prize_name_text,
+                quantity=prize_info_text,
+            )
+        except ClawError:
+            raise
         except PlaywrightTimeoutError as exc:
             save_failure_artifacts(self.page, "claim-prize-timeout")
             raise BrowserError(f"Error during prize claim process: {exc}") from exc

@@ -7,6 +7,7 @@ from ..errors import AlreadyRanError, ClawError
 from ..managers.cookie_manager import CookieManager
 from ..managers.prize_log import PrizeLog
 from ..operations.claw import Claw
+from ..prize_result import PrizeResult
 from ..services.authentication import Authentication
 from ..services.browser_setup import BrowserSession
 from ..utilities.debug_artifacts import save_failure_artifacts
@@ -25,7 +26,7 @@ class ClawRunner:
         self.cookie_manager = CookieManager(self.config)
         self.page: Page | None = None
 
-    def run(self) -> None:
+    def run(self) -> PrizeResult:
         time_print("Running claw automation")
         try:
             _, context, page = self.session.start()
@@ -48,16 +49,15 @@ class ClawRunner:
                 if not login_checker.check_login_status():
                     auth.login()
                     self.cookie_manager.save(context)
-                self._execute_claw(claw)
-                return
+                return self._execute_claw(claw)
 
             auth.login()
             if login_checker.check_login_status():
                 self.cookie_manager.save(context)
-                self._execute_claw(claw)
-                return
+                return self._execute_claw(claw)
 
             login_checker.check_wrong_login()
+            raise ClawError("Login failed without a visible error message.")
         except ClawError:
             raise
         except Exception as exc:
@@ -74,7 +74,7 @@ class ClawRunner:
         page.reload()
         page.wait_for_load_state("domcontentloaded")
 
-    def _execute_claw(self, claw: Claw) -> None:
+    def _execute_claw(self, claw: Claw) -> PrizeResult:
         time_print("Executing Claw operations")
         hero = claw.pick_hero()
-        claw.claim_prize(hero)
+        return claw.claim_prize(hero)
