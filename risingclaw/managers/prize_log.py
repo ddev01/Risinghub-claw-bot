@@ -22,7 +22,6 @@ class PrizeLog:
         entry = {
             "date": now.strftime("%Y-%m-%d"),
             "time": now.strftime("%H:%M:%S"),
-            "account": self.account.id,
             "hero": hero,
             "prize": prize,
             "quantity": quantity,
@@ -33,13 +32,10 @@ class PrizeLog:
         self._write_all(entries)
 
     def read_last(self) -> dict | None:
-        entries = self._entries_for_account(self._read_all())
+        entries = self._read_all()
         if not entries:
             return None
         return entries[-1]
-
-    def _entries_for_account(self, entries: list[dict]) -> list[dict]:
-        return [entry for entry in entries if entry.get("account") == self.account.id]
 
     def _read_all(self) -> list[dict]:
         if not exists(self.path):

@@ -18,7 +18,6 @@ class Authentication:
         try:
             self.page.goto(self.account.login_url)
             hide_stuff(self.page)
-            # self.accept_consent()  # popup removed for now; keep method below
 
             username_field = self.page.locator('input[name="username"]')
             password_field = self.page.locator('input[name="password"]')
@@ -38,13 +37,3 @@ class Authentication:
         except Exception as exc:
             save_failure_artifacts(self.page, "login-error", self.account)
             raise LoginError(f"Login failed: {exc}") from exc
-
-    def accept_consent(self) -> None:
-        time_print("Accepting consent on the webpage")
-        try:
-            self.page.locator(
-                "p.fc-button-label",
-                has_text="Consent",
-            ).click(timeout=10_000)
-        except PlaywrightTimeoutError as exc:
-            time_print(f"Consent button not found or not clickable. Message: {exc}")
