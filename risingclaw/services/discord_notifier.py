@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from ..config import Config, load_config
+from ..config import AppConfig
 from ..prize_result import PrizeResult
 from ..utilities.logger import time_print
 
@@ -13,17 +13,13 @@ class DiscordNotifier:
         self.webhook_url = webhook_url
 
     @classmethod
-    def from_config(cls, config: Config | None = None) -> "DiscordNotifier":
-        config = config or load_config()
+    def from_config(cls, config: AppConfig) -> "DiscordNotifier":
         return cls(config.discord_webhook)
 
-    def notify_success(
-        self, result: PrizeResult, account_id: str | None = None
-    ) -> None:
+    def notify_success(self, result: PrizeResult) -> None:
         if not self.webhook_url:
             return
 
-        account = account_id if account_id is not None else result.account_id
         payload = {
             "embeds": [
                 {
@@ -31,7 +27,7 @@ class DiscordNotifier:
                     "description": "Prize claimed successfully.",
                     "color": 0x57F287,
                     "fields": [
-                        {"name": "Account", "value": account, "inline": True},
+                        {"name": "Account", "value": result.account_id, "inline": True},
                         {"name": "Hero", "value": result.hero, "inline": True},
                         {"name": "Prize", "value": result.prize, "inline": True},
                         {"name": "Quantity", "value": result.quantity, "inline": True},

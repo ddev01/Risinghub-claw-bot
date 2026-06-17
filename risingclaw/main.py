@@ -9,7 +9,6 @@ from .checks.already_ran import has_already_run
 from .checks.setup_checks import SetupChecks
 from .config import load_config
 from .errors import ClawCooldownError, ClawError
-from .managers.account_store import load_accounts
 from .operations.claw_runner import ClawRunner
 from .services.discord_notifier import DiscordNotifier
 from .utilities.logger import time_print
@@ -25,20 +24,19 @@ def _notify_error(notifier: DiscordNotifier, exc: BaseException | str) -> None:
 
 
 if __name__ == "__main__":
-    notifier = DiscordNotifier.from_config()
+    app_config = load_config()
+    notifier = DiscordNotifier.from_config(app_config)
     try:
         time_print("Starting main execution")
-        app_config = load_config()
-        SetupChecks().run()
-        accounts = load_accounts(app_config)
+        accounts = SetupChecks(app_config).run()
         failures: list[str] = []
         for account in accounts:
-            if has_already_run(account):
+            if has_already_run(account, app_config.timezone):
                 time_print(f"[{account.id}] Already ran today. Skipping.")
                 continue
             try:
                 result = ClawRunner(app_config, account).run()
-                notifier.notify_success(result, account.id)
+                notifier.notify_success(result)
             except ClawCooldownError as exc:
                 time_print(f"[{account.id}] {exc}")
             except ClawError as exc:
