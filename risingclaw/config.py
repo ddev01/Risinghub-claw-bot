@@ -27,6 +27,7 @@ class Config:
     browser: str
     data_dir: str
     timezone: str
+    discord_webhook: str | None
 
     @property
     def login_url(self) -> str:
@@ -71,6 +72,7 @@ def load_config() -> Config:
         browser=getenv("BROWSER", "chromium"),
         data_dir=getenv("DATA_DIR", "data"),
         timezone=getenv("TZ", "Europe/Amsterdam"),
+        discord_webhook=getenv("DISCORD_WEBHOOK") or None,
     )
     config.ensure_data_dir()
     return config

@@ -37,6 +37,8 @@ HEADLESS=true
 python -m risingclaw.main
 ```
 
+Optional `DISCORD_WEBHOOK` sends a formatted embed on success (hero, prize, quantity) and `@everyone` alerts on failures.
+
 ## Data files
 
 | Path | Purpose |
@@ -61,7 +63,7 @@ Set `TZ=Europe/Amsterdam` in the environment so logs and cooldown logic align wi
 See [`deploy/cron.example`](deploy/cron.example). Example:
 
 ```cron
-5 1 * * * TZ=Europe/Amsterdam cd /path/to/Risinghub-claw-bot && /path/to/venv/bin/python -m risingclaw.main >> /path/to/Risinghub-claw-bot/cron.log 2>&1
+5 2 * * * TZ=Europe/Amsterdam cd /path/to/Risinghub-claw-bot && /path/to/venv/bin/python -m risingclaw.main >> /path/to/Risinghub-claw-bot/cron.log 2>&1
 ```
 
 ### systemd
