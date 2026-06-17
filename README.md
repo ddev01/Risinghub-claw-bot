@@ -74,7 +74,9 @@ python -m risingclaw.main
 
 One invocation processes every account in `data/accounts.json` in order. Accounts that already ran today are skipped; a failure on one account does not stop the others.
 
-Optional `DISCORD_WEBHOOK` sends a formatted embed on success (account, hero, prize, quantity) and `@everyone` alerts on failures. Success embeds include an **Account** field with the account `id`. Error messages are prefixed with `[account_id]`.
+If the claw is still on cooldown for an account (site timer not cleared), the bot logs the message and continues — no Discord alert, that account is not counted as a failure, and the process exit code stays 0 unless another account failed.
+
+Optional `DISCORD_WEBHOOK` sends a formatted embed on success (account, hero, prize, quantity) and `@everyone` alerts on failures. Success embeds include an **Account** field with the account `id`. Error messages are prefixed with `[account_id]`. Cooldown skips are not sent to Discord.
 
 ## Data files
 
@@ -107,7 +109,7 @@ If you previously used `USERNAME`, `PASSWORD`, and `HEROES` in `.env` with files
    - `data/heroes.json` → `data/accounts/main/heroes.json`
 4. Remove `USERNAME`, `PASSWORD`, and `HEROES` from `.env`.
 
-The bot does not read credentials from `.env` anymore. If `data/accounts.json` is missing, startup fails with a message to create it.
+The bot does not read credentials from `.env` anymore. If `data/accounts.json` is missing or empty, startup fails during setup checks (`SetupChecks`) with a message to copy `accounts.example.json`. The loader warns and returns an empty list when the file is absent, but setup validates accounts and raises before the run loop starts.
 
 ## Daily run guard
 
@@ -149,7 +151,7 @@ journalctl -u risingclaw.service
 - **Browser missing:** run `playwright install chromium` inside the same venv.
 - **Login fails:** check `data/accounts/{id}/debug/` for screenshots and page HTML.
 - **Selectors broken:** the target site may have changed; update locators in `risingclaw/operations/claw.py` and related modules.
-- **accounts.json missing or invalid:** copy `accounts.example.json` to `data/accounts.json` and fill in placeholders.
+- **accounts.json missing or invalid:** startup fails during setup checks before any account runs (not silently at load time). Copy `accounts.example.json` to `data/accounts.json` and fill in at least one account. Invalid JSON, empty arrays, or duplicate `id` values also fail at setup.
 
 ## Smoke test checklist
 
