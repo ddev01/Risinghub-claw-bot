@@ -17,10 +17,13 @@ class DiscordNotifier:
         config = config or load_config()
         return cls(config.discord_webhook)
 
-    def notify_success(self, result: PrizeResult) -> None:
+    def notify_success(
+        self, result: PrizeResult, account_id: str | None = None
+    ) -> None:
         if not self.webhook_url:
             return
 
+        account = account_id if account_id is not None else result.account_id
         payload = {
             "embeds": [
                 {
@@ -28,6 +31,7 @@ class DiscordNotifier:
                     "description": "Prize claimed successfully.",
                     "color": 0x57F287,
                     "fields": [
+                        {"name": "Account", "value": account, "inline": True},
                         {"name": "Hero", "value": result.hero, "inline": True},
                         {"name": "Prize", "value": result.prize, "inline": True},
                         {"name": "Quantity", "value": result.quantity, "inline": True},
