@@ -1,0 +1,13 @@
+[
+  {
+    "id": "account_one",
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME",
+    "heroes": ["hero_alpha", "hero_beta"]
+  },
+  {
+    "id": "account_two",
+    "username": "CHANGE_ME",
+    "password": "CHANGE_ME"
+  }
+]
